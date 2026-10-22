@@ -1,0 +1,15 @@
+name: LuoDiGuiGen
+version: 1.0.0
+main: com.pjminecraft.luodiguigen.LuoDiGuiGenPlugin
+api-version: '26.3'
+description: 树木的原木被砍光后，树叶立刻枯萎，并在最底部的原木处种回原树苗
+author: adongshaln
+commands:
+  luodiguigen:
+    description: 重载落地归根
+    usage: /luodiguigen reload
+    permission: luodiguigen.reload
+permissions:
+  luodiguigen.reload:
+    description: 重载落地归根配置
+    default: op
