@@ -146,6 +146,21 @@ class TreeGraphTest {
         assertFalse(snapshot.leaves().contains(new TreeGraph.Pos(8, 0, 0)));
     }
 
+    @Test
+    void joinedCanopiesWitherOnlyLeavesCloserToTheFelledTree() {
+        Grid grid = new Grid().trunk(0, 0, 0).trunk(6, 0, 0);
+        for (int x = -2; x <= 8; x++) {
+            grid.leaf(x, 1, 0);
+        }
+        grid.leaf(-1, 0, 0).leaf(0, 0, 1).leaf(0, 0, -1).leaf(-2, 0, 0).leaf(0, 2, 0).leaf(-1, 1, 1);
+        TreeGraph.Snapshot snapshot = TreeGraph.capture(grid, new TreeGraph.Pos(0, 0, 0), 6);
+        assertNotNull(snapshot);
+        Set<TreeGraph.Pos> spared = TreeGraph.supportedLeaves(grid, snapshot);
+        assertTrue(spared.contains(new TreeGraph.Pos(5, 1, 0)));
+        assertFalse(spared.contains(new TreeGraph.Pos(-1, 0, 0)));
+        assertFalse(snapshot.trunks().contains(new TreeGraph.Pos(6, 0, 0)));
+    }
+
     private static Grid canopy(Grid grid, int x, int y) {
         return grid.leaf(x + 1, y, 0).leaf(x - 1, y, 0).leaf(x, y + 1, 0)
                 .leaf(x, y, 1).leaf(x, y, -1).leaf(x + 1, y + 1, 0);

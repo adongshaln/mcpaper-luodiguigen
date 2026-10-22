@@ -1,6 +1,7 @@
 package com.pjminecraft.luodiguigen;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -242,7 +243,7 @@ public final class TreeGraph {
             if (current >= LEAF_REACH) {
                 continue;
             }
-            for (Pos next : faceNeighbors(pos)) {
+            for (Pos next : leafNeighbors(pos)) {
                 if (!seen.add(next) || !blocks.isCanopyLeaf(next)) {
                     continue;
                 }
@@ -257,45 +258,60 @@ public final class TreeGraph {
         return leaves;
     }
 
+    /**
+     * 树叶连成一片时，按离哪边的原木更近来分。
+     * 另一棵树的原木不比这棵更远，这片叶子就留给它，不跟着枯萎。
+     */
     private static Set<Pos> supportedByOtherLogs(Blocks blocks, Set<Pos> ownTrunks, Set<Pos> leaves, int[] bounds) {
         if (leaves.isEmpty()) {
             return Set.of();
         }
-        long spanX = (long) bounds[3] - bounds[0] + 1 + 2L * SUPPORT_REACH;
-        long spanY = (long) bounds[4] - bounds[1] + 1 + 2L * SUPPORT_REACH;
-        long spanZ = (long) bounds[5] - bounds[2] + 1 + 2L * SUPPORT_REACH;
-        if (spanX < 1 || spanY < 1 || spanZ < 1 || spanX * spanY * spanZ > MAX_SUPPORT_VOLUME) {
+        Map<Pos, Integer> ownDistance = new HashMap<>();
+        ArrayDeque<Pos> queue = new ArrayDeque<>();
+        for (Pos trunk : ownTrunks) {
+            ownDistance.put(trunk, 0);
+            queue.add(trunk);
+        }
+        Set<Pos> foreignLogs = new HashSet<>();
+        while (!queue.isEmpty()) {
+            Pos pos = queue.removeFirst();
+            int current = ownDistance.get(pos);
+            for (Pos next : leafNeighbors(pos)) {
+                if (blocks.isLog(next) && !ownTrunks.contains(next)) {
+                    foreignLogs.add(next);
+                }
+                if (current >= LEAF_REACH || ownDistance.containsKey(next) || !leaves.contains(next)) {
+                    continue;
+                }
+                ownDistance.put(next, current + 1);
+                queue.add(next);
+            }
+        }
+        if (foreignLogs.isEmpty()) {
             return Set.of();
         }
-        ArrayDeque<Pos> queue = new ArrayDeque<>();
-        Map<Pos, Integer> distance = new HashMap<>();
-        for (int x = bounds[0] - SUPPORT_REACH; x <= bounds[3] + SUPPORT_REACH; x++) {
-            for (int y = bounds[1] - SUPPORT_REACH; y <= bounds[4] + SUPPORT_REACH; y++) {
-                for (int z = bounds[2] - SUPPORT_REACH; z <= bounds[5] + SUPPORT_REACH; z++) {
-                    Pos pos = new Pos(x, y, z);
-                    if (ownTrunks.contains(pos) || !blocks.isLog(pos)) {
-                        continue;
-                    }
-                    queue.add(pos);
-                    distance.put(pos, 0);
-                }
-            }
+        Map<Pos, Integer> foreignDistance = new HashMap<>();
+        queue.clear();
+        for (Pos log : foreignLogs) {
+            foreignDistance.put(log, 0);
+            queue.add(log);
         }
         Set<Pos> supported = new HashSet<>();
         while (!queue.isEmpty()) {
             Pos pos = queue.removeFirst();
-            int current = distance.get(pos);
-            if (current >= SUPPORT_REACH) {
+            int current = foreignDistance.get(pos);
+            if (current >= LEAF_REACH) {
                 continue;
             }
-            for (Pos next : faceNeighbors(pos)) {
-                if (distance.containsKey(next) || !blocks.isAnyLeaf(next)) {
+            for (Pos next : leafNeighbors(pos)) {
+                if (foreignDistance.containsKey(next) || !blocks.isAnyLeaf(next)) {
                     continue;
                 }
                 int nextDistance = current + 1;
-                distance.put(next, nextDistance);
+                foreignDistance.put(next, nextDistance);
                 queue.add(next);
-                if (leaves.contains(next)) {
+                Integer own = ownDistance.get(next);
+                if (leaves.contains(next) && own != null && nextDistance <= own) {
                     supported.add(next);
                 }
             }
@@ -356,6 +372,22 @@ public final class TreeGraph {
             }
         }
         return new int[] {minX, minY, minZ, maxX, maxY, maxZ};
+    }
+
+    /** 树叶斜着挨在一起也算连着，森林里两顶树冠经常只在角上碰上。 */
+    private static List<Pos> leafNeighbors(Pos pos) {
+        List<Pos> neighbors = new ArrayList<>();
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dy == 0 && dz == 0) {
+                        continue;
+                    }
+                    neighbors.add(new Pos(pos.x + dx, pos.y + dy, pos.z + dz));
+                }
+            }
+        }
+        return neighbors;
     }
 
     private static List<Pos> faceNeighbors(Pos pos) {
